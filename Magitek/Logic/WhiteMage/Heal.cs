@@ -345,6 +345,10 @@ namespace Magitek.Logic.WhiteMage
             if (!WhiteMageSettings.Instance.Asylum)
                 return false;
 
+            //Don't cast Asylum if the fight is about to end, as it will be wasted    
+            if (Combat.CombatTotalTimeLeft < 20)
+                return false;
+
             if (!Spells.Asylum.IsKnown())
                 return false;
 
@@ -385,6 +389,10 @@ namespace Magitek.Logic.WhiteMage
             if (!WhiteMageSettings.Instance.LiturgyOfTheBell)
                 return false;
 
+            //Don't cast LiturgyOfTheBell if the fight is about to end, as it will be wasted    
+            if (Combat.CombatTotalTimeLeft < 20)
+                return false;
+                
             if (!Spells.LiturgyOfTheBell.IsKnownAndReady())
                 return false;
 
@@ -615,14 +623,9 @@ namespace Magitek.Logic.WhiteMage
             if (canPlenaryIndulgence < WhiteMageSettings.Instance.PlenaryIndulgenceAllies)
                 return false;
 
-            if (await Spells.PlenaryIndulgence.Cast(Core.Me))
-                if (!await Cure3())
-                    if (!await AfflatusRapture())
-                        if (!await Medica3())
-                            if (!await Medica2())
-                                return await Spells.Medica.Cast(Core.Me);
-
-            return false;
+            // Balance Guide Optimization: Removed the nested GCD chain. Plenary Indulgence is an oGCD buff.
+            // The routine's WhiteMage.cs priority correctly handles casting Rapture/Medica on the following tick.
+            return await Spells.PlenaryIndulgence.Cast(Core.Me);
         }
 
         public static async Task<bool> AfflatusSolace()
@@ -837,7 +840,7 @@ namespace Magitek.Logic.WhiteMage
             // Balance Guide Optimization: Blood Lily is DPS neutral/positive. Dump a Lily to prevent overcapping.
             if (Spells.AfflatusRapture.IsKnownAndReady())
                 return await Spells.AfflatusRapture.Cast(Core.Me);
-            
+
             if (Spells.AfflatusSolace.IsKnownAndReady())
             {
                 var target = Group.CastableTanks.FirstOrDefault() ?? Core.Me;
@@ -847,5 +850,5 @@ namespace Magitek.Logic.WhiteMage
             return false;
         }
     }
-    
+
 }
