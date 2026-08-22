@@ -210,12 +210,11 @@
         </controls:SettingsBlock>
 
         <controls:SettingsBlock Background="{DynamicResource ClassSelectorBackground}">
-            <StackPanel Margin="5">
+            <Grid Margin="5">
                 <CheckBox Content="{x:Static properties:Resources.Scholar_Content_Keep_Adloquium_Galvanize_Up_On_The}" IsChecked="{Binding ScholarSettings.AdloquiumTankForBuff, Mode=TwoWay}" Style="{DynamicResource CheckBoxFlat}" />
-                <CheckBox Margin="0,5,0,0" Content="{x:Static properties:Resources.Scholar_Content_SwiftcastAdloWhileMoving}" IsChecked="{Binding ScholarSettings.SwiftcastAdloWhileMoving, Mode=TwoWay}" Style="{DynamicResource CheckBoxFlat}" />
-            </StackPanel>
+            </Grid>
         </controls:SettingsBlock>
-        
+
         <controls:SettingsBlock Margin="0,5,0,0" Background="{DynamicResource ClassSelectorBackground}">
             <StackPanel Margin="5">
                 <StackPanel Orientation="Horizontal">

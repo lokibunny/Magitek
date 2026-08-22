@@ -345,10 +345,6 @@ namespace Magitek.Logic.WhiteMage
             if (!WhiteMageSettings.Instance.Asylum)
                 return false;
 
-            //Don't cast Asylum if the fight is about to end, as it will be wasted    
-            if (Combat.CombatTotalTimeLeft < 20)
-                return false;
-
             if (!Spells.Asylum.IsKnown())
                 return false;
 
@@ -387,10 +383,6 @@ namespace Magitek.Logic.WhiteMage
         public static async Task<bool> LiturgyOfTheBell()
         {
             if (!WhiteMageSettings.Instance.LiturgyOfTheBell)
-                return false;
-
-            //Don't cast LiturgyOfTheBell if the fight is about to end, as it will be wasted    
-            if (Combat.CombatTotalTimeLeft < 20)
                 return false;
 
             if (!Spells.LiturgyOfTheBell.IsKnownAndReady())
@@ -618,34 +610,19 @@ namespace Magitek.Logic.WhiteMage
             if (!WhiteMageSettings.Instance.PlenaryIndulgence)
                 return false;
 
-            if (!Spells.PlenaryIndulgence.IsKnownAndReady())
-                return false;
-
             var canPlenaryIndulgence = Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent < WhiteMageSettings.Instance.PlenaryIndulgenceHealthPercent);
 
             if (canPlenaryIndulgence < WhiteMageSettings.Instance.PlenaryIndulgenceAllies)
                 return false;
 
-            // Balance Guide Optimization: Look-Ahead Logic
-            // PI does no healing on its own. We only cast it if we guarantee the routine will naturally 
-            // follow up with an AoE GCD heal on the very next tick to consume the Confession buff.
-            bool willFollowUpWithAoe = false;
+            if (await Spells.PlenaryIndulgence.Cast(Core.Me))
+                if (!await Cure3())
+                    if (!await AfflatusRapture())
+                        if (!await Medica3())
+                            if (!await Medica2())
+                                return await Spells.Medica.Cast(Core.Me);
 
-            // Check if Rapture is ready and needed
-            if (Spells.AfflatusRapture.IsKnown() && ActionResourceManager.WhiteMage.Lily > 0 &&
-                Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent <= WhiteMageSettings.Instance.AfflatusRaptureHealthPercent) >= AoeNeedHealing)
-                willFollowUpWithAoe = true;
-            // Check if Medica II/III is ready and needed
-            else if (Spells.Medica2.IsKnown() && Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent <= WhiteMageSettings.Instance.Medica2HealthPercent) >= AoeNeedHealing)
-                willFollowUpWithAoe = true;
-            // Check if Cure III is ready and needed
-            else if (Spells.Cure3.IsKnown() && Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent <= WhiteMageSettings.Instance.Cure3HealthPercent) >= AoeNeedHealing)
-                willFollowUpWithAoe = true;
-
-            if (!willFollowUpWithAoe)
-                return false;
-
-            return await Spells.PlenaryIndulgence.Cast(Core.Me);
+            return false;
         }
 
         public static async Task<bool> AfflatusSolace()
@@ -708,6 +685,16 @@ namespace Magitek.Logic.WhiteMage
                 return false;
 
             if (!Core.Me.HasAura(Auras.DivineGrace))
+                return false;
+
+            // Hold Divine Caress if Temperance is active so we can chain the mitigation/shields, 
+            // unless the Grace buff is expiring.
+            bool temperanceActive = Core.Me.HasAura(Auras.Temperance);
+
+            // If we DO NOT have the aura with at least 5 seconds left, it is expiring.
+            bool graceExpiring = !Core.Me.HasAura(Auras.DivineGrace, true, 5000);
+
+            if (temperanceActive && !graceExpiring)
                 return false;
 
             return await Spells.DivineCaress.Cast(Core.Me);
@@ -848,27 +835,5 @@ namespace Magitek.Logic.WhiteMage
         {
             return Healer.ForceLimitBreak(Spells.HealingWind, Spells.BreathoftheEarth, Spells.PulseofLife, Spells.Stone);
         }
-        public static async Task<bool> BurnLily()
-        {
-            if (!Core.Me.InCombat)
-                return false;
-
-            // If we aren't capped on Lilies, do nothing
-            if (ActionResourceManager.WhiteMage.Lily < 3)
-                return false;
-
-            // Balance Guide Optimization: Blood Lily is DPS neutral/positive. Dump a Lily to prevent overcapping.
-            if (Spells.AfflatusRapture.IsKnownAndReady())
-                return await Spells.AfflatusRapture.Cast(Core.Me);
-
-            if (Spells.AfflatusSolace.IsKnownAndReady())
-            {
-                var target = Group.CastableTanks.FirstOrDefault() ?? Core.Me;
-                return await Spells.AfflatusSolace.Cast(target);
-            }
-
-            return false;
-        }
     }
-
 }

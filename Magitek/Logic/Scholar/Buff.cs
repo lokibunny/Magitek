@@ -56,7 +56,7 @@ namespace Magitek.Logic.Scholar
                     if (await Spells.SummonEos.Cast(Core.Me))
                     {
                         FairySummonCooldown = DateTime.Now.AddSeconds(10);
-                        return true; // Balance Optimization: Removed 5-second stall.
+                        break;
                     }
                     return false;
 
@@ -64,15 +64,15 @@ namespace Magitek.Logic.Scholar
                     if (await Spells.SummonSelene.Cast(Core.Me))
                     {
                         FairySummonCooldown = DateTime.Now.AddSeconds(10);
-                        return true; // Balance Optimization: Removed 5-second stall.
+                        break;
                     }
                     return false;
 
                 default:
                     return false;
             }
-            
-            // DELETE the "return await Coroutine.Wait(5000, () => Core.Me.Pet != null);" line that was here!
+
+            return await Coroutine.Wait(5000, () => Core.Me.Pet != null);
         }
 
         public static async Task<bool> SummonSeraph()
@@ -262,13 +262,10 @@ namespace Magitek.Logic.Scholar
             if (!await Spells.EmergencyTactics.CastAura(Core.Me, Auras.EmergencyTactics))
                 return false;
 
-            return await Coroutine.Wait(1500, () => Core.Me.HasAura(Auras.EmergencyTactics) && ActionManager.CanCast(Spells.Adloquium.Id, Core.Me));
+            // Dawntrail Fix: Check for Manifestation if under Seraphism so the coroutine doesn't hang
+            var adloCheck = Core.Me.HasAura(Auras.Seraphism) && Spells.Manifestation.IsKnown() ? Spells.Manifestation.Id : Spells.Adloquium.Id;
 
-            //if (await Spells.EmergencyTactics.CastAura(Core.Me, Auras.EmergencyTactics)) {
-            //    return await Coroutine.Wait(1700, () => Core.Me.HasAura(Auras.EmergencyTactics, true));
-            //}
-
-            //return false;
+            return await Coroutine.Wait(1500, () => Core.Me.HasAura(Auras.EmergencyTactics) && ActionManager.CanCast(adloCheck, Core.Me));
         }
 
         public static async Task<bool> Aetherflow()
@@ -358,13 +355,10 @@ namespace Magitek.Logic.Scholar
                     if (!Globals.InParty && Core.Me.CurrentTarget.IsBoss())
                         return await Spells.ChainStrategem.Cast(Core.Me.CurrentTarget);
 
-                    // Raid Optimization: Removed the 'TargetGameObject.IsTank()' requirement.
-                    // Bosses frequently drop targets or target DPS during mechanics. Chain Stratagem must fire on cooldown.
-                    var chainStrategemsBossTarget = GameObjectManager.Attackers.FirstOrDefault(r => r.WithinSpellRange(Spells.ChainStrategem.Range) && r.IsBoss() && r.HasAura(Auras.ChainStratagem) == false);
+                    var chainStrategemsBossTarget = GameObjectManager.Attackers.FirstOrDefault(r => r.WithinSpellRange(Spells.ChainStrategem.Range) && r.IsBoss() && r.HasAura(Auras.ChainStratagem) == false && r.HasTarget && r.TargetGameObject.IsTank());
 
                     if (chainStrategemsBossTarget == null || !chainStrategemsBossTarget.ThoroughCanAttack())
                         return false;
-                    
                     //if (Casting.LastSpell != Spells.Biolysis || Casting.LastSpell != Spells.ArtOfWar || Casting.LastSpell != Spells.Adloquium || Casting.LastSpell != Spells.Succor)
                     //    if (await Spells.Ruin2.Cast(Core.Me.CurrentTarget))
                     //        return true;

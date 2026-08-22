@@ -66,8 +66,9 @@ namespace Magitek.Logic.WhiteMage
             if (Core.Me.CurrentTarget == null)
                 return false;
 
-            // Balance Guide Optimization: Assize must be used strictly on cooldown. 
-            // Removed the Dia aura duration check that caused cooldown drift.
+            if (Spells.Dia.IsKnown() && !Core.Me.CurrentTarget.HasAura(Auras.Dia, true, 6000))
+                return false;
+
             return await Spells.Assize.Cast(Core.Me);
         }
     }

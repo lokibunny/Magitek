@@ -111,12 +111,14 @@ namespace Magitek.Logic.Scholar
             if (!ScholarSettings.Instance.ForceSuccor)
                 return false;
 
-            if (!await Spells.Succor.Cast(Core.Me)) return false;
+            var succorSpell = Spells.Concitation.IsKnown() ? Spells.Concitation : Spells.Succor;
+            if (Core.Me.HasAura(Auras.Seraphism) && Spells.Accession.IsKnown()) succorSpell = Spells.Accession;
+
+            if (!await succorSpell.Cast(Core.Me)) return false;
             ScholarSettings.Instance.ForceSuccor = false;
             TogglesManager.ResetToggles();
             return true;
         }
-
         public static async Task<bool> ForceEmergencySuccor()
         {
             if (!ScholarSettings.Instance.ForceEmergencySuccor)
@@ -128,7 +130,10 @@ namespace Magitek.Logic.Scholar
             if (!await UsedEmergencyTactics())
                 return false;
 
-            if (!await Spells.Succor.Cast(Core.Me)) return false;
+            var succorSpell = Spells.Concitation.IsKnown() ? Spells.Concitation : Spells.Succor;
+            if (Core.Me.HasAura(Auras.Seraphism) && Spells.Accession.IsKnown()) succorSpell = Spells.Accession;
+
+            if (!await succorSpell.Cast(Core.Me)) return false;
             ScholarSettings.Instance.ForceEmergencySuccor = false;
             TogglesManager.ResetToggles();
             return true;
@@ -177,14 +182,21 @@ namespace Magitek.Logic.Scholar
                 return false;
             if (!await Coroutine.Wait(1000, () => Core.Me.HasAura(Auras.EmergencyTactics)))
                 return false;
-            return await Coroutine.Wait(1000, () => ActionManager.CanCast(Spells.Succor.Id, Core.Me));
+
+            var succorSpell = Spells.Concitation.IsKnown() ? Spells.Concitation : Spells.Succor;
+            var accessionCheck = Core.Me.HasAura(Auras.Seraphism) && Spells.Accession.IsKnown() ? Spells.Accession.Id : succorSpell.Id;
+
+            return await Coroutine.Wait(1000, () => ActionManager.CanCast(accessionCheck, Core.Me));
         }
 
         private static async Task<bool> UsedAdloquium()
         {
             if (Core.Me.HasAura(Auras.Galvanize))
                 return true;
-            if (!await Spells.Adloquium.Cast(Core.Me))
+
+            var adloSpell = Core.Me.HasAura(Auras.Seraphism) && Spells.Manifestation.IsKnown() ? Spells.Manifestation : Spells.Adloquium;
+
+            if (!await adloSpell.Cast(Core.Me))
                 return false;
             if (!await Coroutine.Wait(2000, () => Core.Me.HasAura(Auras.Galvanize)))
                 return false;
@@ -195,7 +207,11 @@ namespace Magitek.Logic.Scholar
         {
             if (Core.Me.HasAura(Auras.Galvanize))
                 return true;
-            if (!await Spells.Succor.Cast(Core.Me))
+
+            var succorSpell = Spells.Concitation.IsKnown() ? Spells.Concitation : Spells.Succor;
+            if (Core.Me.HasAura(Auras.Seraphism) && Spells.Accession.IsKnown()) succorSpell = Spells.Accession;
+
+            if (!await succorSpell.Cast(Core.Me))
                 return false;
             return await Coroutine.Wait(2500, () => Core.Me.HasAura(Auras.Galvanize));
         }
@@ -284,30 +300,11 @@ namespace Magitek.Logic.Scholar
                 return ScholarSettings.Instance.AdloquiumOnlyTank && unit.IsTank();
             }
         }
-public static async Task<bool> Adloquium()
+
+        public static async Task<bool> Adloquium()
         {
             if (!ScholarSettings.Instance.Adloquium)
                 return false;
-
-            // Balance Optimization: Aggressively pre-shield tanks during downtime, pre-pull, or boss jumps.
-            // This provides massive preventative mitigation at zero DPS or MP cost during active combat.
-            if (!Core.Me.InCombat || (Core.Me.CurrentTarget != null && !Core.Me.CurrentTarget.CanAttack))
-            {
-                var tankToShield = Group.CastableTanks.FirstOrDefault(t => !t.HasAura(Auras.Galvanize));
-                if (tankToShield != null && Core.Me.CurrentManaPercent > 50)
-                {
-                    // Stop to cast if we aren't moving, otherwise use Swiftcast if enabled
-                    if (MovementManager.IsMoving)
-                    {
-                        if (!ScholarSettings.Instance.SwiftcastAdloWhileMoving || !Spells.Swiftcast.IsKnownAndReady())
-                            return false;
-                        
-                        if (!await Spells.Swiftcast.CastAura(Core.Me, Auras.Swiftcast))
-                            return false;
-                    }
-                    return await Spells.Adloquium.HealAura(tankToShield, Auras.Galvanize, false);
-                }
-            }
 
             if (!ScholarSettings.Instance.AdloOutOfCombat && !Core.Me.InCombat)
                 return false;
@@ -318,27 +315,23 @@ public static async Task<bool> Adloquium()
             if (Globals.InParty)
             {
                 // If the lowest heal target is higher than Adloquium health, check to see if the user wants us to Galvanize the tank
-                var adloTarget = Group.CastableAlliesWithin30.FirstOrDefault(CanAdlo);
-
                 if (ScholarSettings.Instance.AdloquiumTankForBuff && Globals.HealTarget?.CurrentHealthPercent > ScholarSettings.Instance.AdloquiumHpPercent)
                 {
                     // Pick any tank who doesn't have Galvanize on them
                     var tankAdloTarget = Group.CastableAlliesWithin30.FirstOrDefault(r => r.IsTank() && !r.HasAura(Auras.Galvanize));
-                    if (tankAdloTarget != null)
-                        adloTarget = tankAdloTarget;
+
+                    if (tankAdloTarget == null)
+                        return false;
+
+                    await UseRecitation();
+
+                    return await Spells.Adloquium.HealAura(tankAdloTarget, Auras.Galvanize, false);
                 }
+
+                var adloTarget = Group.CastableAlliesWithin30.FirstOrDefault(CanAdlo);
 
                 if (adloTarget == null)
                     return false;
-
-                if (MovementManager.IsMoving)
-                {
-                    if (!ScholarSettings.Instance.SwiftcastAdloWhileMoving || !Spells.Swiftcast.IsKnownAndReady())
-                        return false;
-
-                    if (!await Spells.Swiftcast.CastAura(Core.Me, Auras.Swiftcast))
-                        return false;
-                }
 
                 await UseRecitation();
 
@@ -346,29 +339,30 @@ public static async Task<bool> Adloquium()
 
                 bool CanAdlo(Character unit)
                 {
-                    if (unit == null) return false;
-                    if (unit.CurrentHealthPercent > ScholarSettings.Instance.AdloquiumHpPercent) return false;
-                    if (unit.HasAura(Auras.Galvanize)) return false;
-                    if (unit.HasAura(Auras.Excogitation)) return false;
+                    if (unit == null)
+                        return false;
 
-                    if (!ScholarSettings.Instance.AdloquiumOnlyHealer && !ScholarSettings.Instance.AdloquiumOnlyTank) return true;
-                    if (ScholarSettings.Instance.AdloquiumOnlyHealer && unit.IsHealer()) return true;
+                    if (unit.CurrentHealthPercent > ScholarSettings.Instance.AdloquiumHpPercent)
+                        return false;
+
+                    if (unit.HasAura(Auras.Galvanize))
+                        return false;
+
+                    if (unit.HasAura(Auras.Excogitation))
+                        return false;
+
+                    if (!ScholarSettings.Instance.AdloquiumOnlyHealer && !ScholarSettings.Instance.AdloquiumOnlyTank)
+                        return true;
+
+                    if (ScholarSettings.Instance.AdloquiumOnlyHealer && unit.IsHealer())
+                        return true;
+
                     return ScholarSettings.Instance.AdloquiumOnlyTank && unit.IsTank();
                 }
             }
 
-            // Solo Logic
             if (Core.Me.CurrentHealthPercent > ScholarSettings.Instance.AdloquiumHpPercent || Core.Me.HasAura(Auras.Galvanize))
                 return false;
-
-            if (MovementManager.IsMoving)
-            {
-                if (!ScholarSettings.Instance.SwiftcastAdloWhileMoving || !Spells.Swiftcast.IsKnownAndReady())
-                    return false;
-
-                if (!await Spells.Swiftcast.CastAura(Core.Me, Auras.Swiftcast))
-                    return false;
-            }
 
             return await Spells.Adloquium.HealAura(Core.Me, Auras.Galvanize);
 
@@ -378,12 +372,18 @@ public static async Task<bool> Adloquium()
                 if (!ScholarSettings.Instance.RecitationWithAdlo) return;
                 if (Spells.Recitation.Cooldown != TimeSpan.Zero) return;
                 if (ScholarSettings.Instance.RecitationOnlyNoAetherflow && Core.Me.HasAetherflow()) return;
-                
+
                 if (!await Spells.Recitation.Cast(Core.Me)) return;
+
                 if (!await Coroutine.Wait(1000, () => Core.Me.HasAura(Auras.Recitation))) return;
-                await Coroutine.Wait(1000, () => ActionManager.CanCast(Spells.Adloquium.Id, Core.Me));
+
+                // Dawntrail Fix: Check for Manifestation to prevent Recitation hanging under Seraphism
+                var adloCheck = Core.Me.HasAura(Auras.Seraphism) && Spells.Manifestation.IsKnown() ? Spells.Manifestation.Id : Spells.Adloquium.Id;
+                await Coroutine.Wait(1000, () => ActionManager.CanCast(adloCheck, Core.Me));
             }
         }
+
+
         public static async Task<bool> EmergencyTacticsSuccor()
         {
             if (!ScholarSettings.Instance.Succor || !ScholarSettings.Instance.EmergencyTactics || !ScholarSettings.Instance.EmergencyTacticsSuccor)
@@ -401,8 +401,11 @@ public static async Task<bool> Adloquium()
             if (!await Buff.EmergencyTactics())
                 return false;
 
-            if (await Spells.Succor.Heal(Core.Me))
-                return await Coroutine.Wait(2500, () => Casting.LastSpell == Spells.Succor || MovementManager.IsMoving);
+            var succorSpell = Spells.Concitation.IsKnown() ? Spells.Concitation : Spells.Succor;
+            if (Core.Me.HasAura(Auras.Seraphism) && Spells.Accession.IsKnown()) succorSpell = Spells.Accession;
+
+            if (await succorSpell.Heal(Core.Me))
+                return await Coroutine.Wait(2500, () => Casting.LastSpell == succorSpell || MovementManager.IsMoving);
 
             return false;
         }
@@ -412,12 +415,6 @@ public static async Task<bool> Adloquium()
             if (!ScholarSettings.Instance.Succor)
                 return false;
 
-            //if (Casting.LastSpell == Spells.Indomitability)
-            //    return false;
-
-            //if (Casting.LastSpell == Spells.Succor)
-            //    return false;
-
             var needSuccor = Group.CastableAlliesWithin20.Count(r => r.IsAlive &&
                                                                      r.CurrentHealthPercent <= ScholarSettings.Instance.SuccorHpPercent &&
                                                                      !r.HasAura(Auras.Galvanize)) >= AoeNeedHealing;
@@ -425,9 +422,12 @@ public static async Task<bool> Adloquium()
             if (!needSuccor)
                 return false;
 
-            if (await Spells.Succor.Heal(Core.Me))
+            var succorSpell = Spells.Concitation.IsKnown() ? Spells.Concitation : Spells.Succor;
+            if (Core.Me.HasAura(Auras.Seraphism) && Spells.Accession.IsKnown()) succorSpell = Spells.Accession;
+
+            if (await succorSpell.Heal(Core.Me))
             {
-                return await Coroutine.Wait(2500, () => Casting.LastSpell == Spells.Succor || MovementManager.IsMoving);
+                return await Coroutine.Wait(2500, () => Casting.LastSpell == succorSpell || MovementManager.IsMoving);
             }
 
             return false;
@@ -530,12 +530,7 @@ public static async Task<bool> Adloquium()
 
             if (Globals.InParty)
             {
-                // Balance Optimization: Excogitation is a preventative buffer.
-                // Proactively place it on tanks taking damage instead of waiting for them to reach critical HP.
-                var excogitationTarget = Group.CastableTanks.FirstOrDefault(t => !t.HasAura(Auras.Excogitation) && t.CurrentHealthPercent <= 90);
-                
-                if (excogitationTarget == null)
-                    excogitationTarget = Group.CastableAlliesWithin30.FirstOrDefault(CanExcogitation);
+                var excogitationTarget = Group.CastableAlliesWithin30.FirstOrDefault(CanExcogitation);
 
                 if (excogitationTarget == null)
                     return false;
@@ -729,6 +724,7 @@ public static async Task<bool> Adloquium()
                 await Coroutine.Wait(1000, () => ActionManager.CanCast(Spells.Indomitability.Id, Core.Me));
             }
         }
+
         public static async Task<bool> SacredSoil()
         {
             if (!ScholarSettings.Instance.SacredSoil)
@@ -744,17 +740,8 @@ public static async Task<bool> Adloquium()
             if (Spells.SacredSoil.Cooldown != TimeSpan.Zero)
                 return false;
 
-            // Balance Optimization: Sacred Soil provides a 500p HoT at lv78+. Allow it for high-efficiency single-target tank healing.
-            bool aoeNeedsSoil = Group.CastableAlliesWithin30.Any(r => PartyManager.VisibleMembers.Count(x => x.BattleCharacter.CurrentHealthPercent < ScholarSettings.Instance.SacredSoilHpPercent && x.BattleCharacter.Distance(r) <= Spells.SacredSoil.Radius) >= AoeNeedHealing);
-            bool tankNeedsSoil = Group.CastableTanks.Any(t => t.CurrentHealthPercent <= 85);
-
-            if (!aoeNeedsSoil && !tankNeedsSoil)
-                return false;
-
-            // Center on the most injured cluster, or fallback to centering directly on the hurt tank.
-            var sacredSoilTarget = aoeNeedsSoil
-                ? Group.CastableAlliesWithin30.FirstOrDefault(r => PartyManager.VisibleMembers.Count(x => x.BattleCharacter.CurrentHealthPercent < ScholarSettings.Instance.SacredSoilHpPercent && x.BattleCharacter.Distance(r) <= Spells.SacredSoil.Radius) >= AoeNeedHealing)
-                : Group.CastableTanks.FirstOrDefault(t => t.CurrentHealthPercent <= 85);
+            var sacredSoilTarget = Group.CastableAlliesWithin30.FirstOrDefault(r => PartyManager.VisibleMembers.Count(x => x.BattleCharacter.CurrentHealthPercent < ScholarSettings.Instance.SacredSoilHpPercent
+                    && x.BattleCharacter.WithinSpellRange(Spells.SacredSoil.Radius)) >= AoeNeedHealing);
 
             if (sacredSoilTarget == null)
                 return false;

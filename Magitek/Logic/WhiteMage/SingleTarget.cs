@@ -29,6 +29,10 @@ namespace Magitek.Logic.WhiteMage
             if (!Core.Me.HasAura(Auras.SacredSight))
                 return false;
 
+            // Target safety check
+            if (Core.Me.CurrentTarget == null || !Core.Me.CurrentTarget.CanAttack)
+                return false;
+
             return await Spells.GlareIV.Cast(Core.Me.CurrentTarget);
         }
 
@@ -36,28 +40,18 @@ namespace Magitek.Logic.WhiteMage
         {
             if (!WhiteMageSettings.Instance.DoDamage)
                 return false;
-
             if (!Spells.AfflatusMisery.IsKnown())
                 return false;
-
             if (!WhiteMageSettings.Instance.UseAfflatusMisery)
                 return false;
-
             if (ActionResourceManager.WhiteMage.BloodLily < 3)
                 return false;
-
             var target = Core.Me.CurrentTarget;
             if (target == null)
                 return false;
-
-            // Balance Guide Optimization: Misery is 1240 potency (equal to 4 Glares). 
-            // We bypass the AoE restriction if the target is a boss to guarantee we spend the Blood Lily for single-target burst.
-            if (!BotManager.Current.IsAutonomous 
-                && !MovementManager.IsMoving 
-                && !target.IsBoss() 
+            if (!BotManager.Current.IsAutonomous && !MovementManager.IsMoving
                 && Combat.Enemies.Count(r => r.Distance(target) <= 5 + r.CombatReach) < WhiteMageSettings.Instance.AfflatusMiseryEnemies)
                 return false;
-
             return await Spells.AfflatusMisery.Cast(target);
         }
 

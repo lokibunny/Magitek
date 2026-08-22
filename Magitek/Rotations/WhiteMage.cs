@@ -103,15 +103,13 @@ namespace Magitek.Rotations
 
             if (await Logic.WhiteMage.Heal.Benediction()) return true;
             if (await Logic.WhiteMage.Heal.LiturgyOfTheBell()) return true;
-            
-            // Balance Guide Optimization: Drop Asylum before burning GCDs so Rapture/Cure III benefit from the +10% healing received buff.
-            if (await Logic.WhiteMage.Heal.Asylum()) return true;
 
             if (Globals.InParty)
             {
                 // if (await Logic.WhiteMage.Heal.AssizeHeal()) return true;
                 if (await Logic.WhiteMage.Heal.AfflatusRapture()) return true;
                 if (await Logic.WhiteMage.Heal.Cure3()) return true;
+                if (await Logic.WhiteMage.Heal.Asylum()) return true;
                 if (await Logic.WhiteMage.Heal.Medica3()) return true;
                 if (await Logic.WhiteMage.Heal.Medica2()) return true;
                 if (await Logic.WhiteMage.Heal.Medica()) return true;
@@ -185,9 +183,6 @@ namespace Magitek.Rotations
 
             if (await SingleTarget.GlareIV()) return true;
             if (await SingleTarget.AfflatusMisery()) return true;
-
-            // Prevent Lily overcapping before dropping Glare/Holy
-            if (await Logic.WhiteMage.Heal.BurnLily()) return true;
 
             if (await Aoe.Holy()) return true;
             if (await Aoe.AssizeDamage()) return true;
