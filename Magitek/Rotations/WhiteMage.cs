@@ -184,9 +184,12 @@ namespace Magitek.Rotations
             if (await SingleTarget.GlareIV()) return true;
             if (await SingleTarget.AfflatusMisery()) return true;
 
+            // Prevent Lily overcapping before dropping Glare/Holy
+            if (await Logic.WhiteMage.Heal.BurnLily()) return true;
+
             if (await Aoe.Holy()) return true;
             if (await Aoe.AssizeDamage()) return true;
-
+            
             return await SingleTarget.Stone();
         }
 

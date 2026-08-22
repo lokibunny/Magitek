@@ -825,5 +825,27 @@ namespace Magitek.Logic.WhiteMage
         {
             return Healer.ForceLimitBreak(Spells.HealingWind, Spells.BreathoftheEarth, Spells.PulseofLife, Spells.Stone);
         }
+        public static async Task<bool> BurnLily()
+        {
+            if (!Core.Me.InCombat)
+                return false;
+
+            // If we aren't capped on Lilies, do nothing
+            if (ActionResourceManager.WhiteMage.Lily < 3)
+                return false;
+
+            // Balance Guide Optimization: Blood Lily is DPS neutral/positive. Dump a Lily to prevent overcapping.
+            if (Spells.AfflatusRapture.IsKnownAndReady())
+                return await Spells.AfflatusRapture.Cast(Core.Me);
+            
+            if (Spells.AfflatusSolace.IsKnownAndReady())
+            {
+                var target = Group.CastableTanks.FirstOrDefault() ?? Core.Me;
+                return await Spells.AfflatusSolace.Cast(target);
+            }
+
+            return false;
+        }
     }
+    
 }
