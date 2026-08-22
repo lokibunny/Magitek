@@ -358,10 +358,13 @@ namespace Magitek.Logic.Scholar
                     if (!Globals.InParty && Core.Me.CurrentTarget.IsBoss())
                         return await Spells.ChainStrategem.Cast(Core.Me.CurrentTarget);
 
-                    var chainStrategemsBossTarget = GameObjectManager.Attackers.FirstOrDefault(r => r.WithinSpellRange(Spells.ChainStrategem.Range) && r.IsBoss() && r.HasAura(Auras.ChainStratagem) == false && r.HasTarget && r.TargetGameObject.IsTank());
+                    // Raid Optimization: Removed the 'TargetGameObject.IsTank()' requirement.
+                    // Bosses frequently drop targets or target DPS during mechanics. Chain Stratagem must fire on cooldown.
+                    var chainStrategemsBossTarget = GameObjectManager.Attackers.FirstOrDefault(r => r.WithinSpellRange(Spells.ChainStrategem.Range) && r.IsBoss() && r.HasAura(Auras.ChainStratagem) == false);
 
                     if (chainStrategemsBossTarget == null || !chainStrategemsBossTarget.ThoroughCanAttack())
                         return false;
+                    
                     //if (Casting.LastSpell != Spells.Biolysis || Casting.LastSpell != Spells.ArtOfWar || Casting.LastSpell != Spells.Adloquium || Casting.LastSpell != Spells.Succor)
                     //    if (await Spells.Ruin2.Cast(Core.Me.CurrentTarget))
                     //        return true;
