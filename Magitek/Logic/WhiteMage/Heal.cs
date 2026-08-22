@@ -392,7 +392,7 @@ namespace Magitek.Logic.WhiteMage
             //Don't cast LiturgyOfTheBell if the fight is about to end, as it will be wasted    
             if (Combat.CombatTotalTimeLeft < 20)
                 return false;
-                
+
             if (!Spells.LiturgyOfTheBell.IsKnownAndReady())
                 return false;
 
@@ -618,13 +618,33 @@ namespace Magitek.Logic.WhiteMage
             if (!WhiteMageSettings.Instance.PlenaryIndulgence)
                 return false;
 
+            if (!Spells.PlenaryIndulgence.IsKnownAndReady())
+                return false;
+
             var canPlenaryIndulgence = Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent < WhiteMageSettings.Instance.PlenaryIndulgenceHealthPercent);
 
             if (canPlenaryIndulgence < WhiteMageSettings.Instance.PlenaryIndulgenceAllies)
                 return false;
 
-            // Balance Guide Optimization: Removed the nested GCD chain. Plenary Indulgence is an oGCD buff.
-            // The routine's WhiteMage.cs priority correctly handles casting Rapture/Medica on the following tick.
+            // Balance Guide Optimization: Look-Ahead Logic
+            // PI does no healing on its own. We only cast it if we guarantee the routine will naturally 
+            // follow up with an AoE GCD heal on the very next tick to consume the Confession buff.
+            bool willFollowUpWithAoe = false;
+
+            // Check if Rapture is ready and needed
+            if (Spells.AfflatusRapture.IsKnown() && ActionResourceManager.WhiteMage.Lily > 0 &&
+                Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent <= WhiteMageSettings.Instance.AfflatusRaptureHealthPercent) >= AoeNeedHealing)
+                willFollowUpWithAoe = true;
+            // Check if Medica II/III is ready and needed
+            else if (Spells.Medica2.IsKnown() && Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent <= WhiteMageSettings.Instance.Medica2HealthPercent) >= AoeNeedHealing)
+                willFollowUpWithAoe = true;
+            // Check if Cure III is ready and needed
+            else if (Spells.Cure3.IsKnown() && Group.CastableAlliesWithin30.Count(r => r.CurrentHealthPercent <= WhiteMageSettings.Instance.Cure3HealthPercent) >= AoeNeedHealing)
+                willFollowUpWithAoe = true;
+
+            if (!willFollowUpWithAoe)
+                return false;
+
             return await Spells.PlenaryIndulgence.Cast(Core.Me);
         }
 
