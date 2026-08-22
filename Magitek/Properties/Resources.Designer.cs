@@ -12835,7 +12835,14 @@ namespace Magitek.Properties {
                 return ResourceManager.GetString("Scholar_Content_Accession", resourceCulture);
             }
         }
-        
+        /// <summary>
+        ///   Looks up a localized string similar to Swiftcast Adloquium While Moving.
+        /// </summary>
+        public static string Scholar_Content_SwiftcastAdloWhileMoving {
+            get {
+                return ResourceManager.GetString("Scholar_Content_SwiftcastAdloWhileMoving", resourceCulture);
+            }
+        }
         /// <summary>
         ///   Looks up a localized string similar to Adlo.
         /// </summary>
