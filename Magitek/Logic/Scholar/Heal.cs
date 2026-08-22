@@ -709,12 +709,11 @@ namespace Magitek.Logic.Scholar
                 await Coroutine.Wait(1000, () => ActionManager.CanCast(Spells.Indomitability.Id, Core.Me));
             }
         }
-
         public static async Task<bool> SacredSoil()
         {
             if (!ScholarSettings.Instance.SacredSoil)
                 return false;
-
+                
             // Extra double cast spell since Sacred Soil is a quick animation instant spell
             if (Casting.LastSpell == Spells.SacredSoil)
                 return false;
@@ -725,8 +724,17 @@ namespace Magitek.Logic.Scholar
             if (Spells.SacredSoil.Cooldown != TimeSpan.Zero)
                 return false;
 
-            var sacredSoilTarget = Group.CastableAlliesWithin30.FirstOrDefault(r => PartyManager.VisibleMembers.Count(x => x.BattleCharacter.CurrentHealthPercent < ScholarSettings.Instance.SacredSoilHpPercent
-                    && x.BattleCharacter.WithinSpellRange(Spells.SacredSoil.Radius)) >= AoeNeedHealing);
+            // Balance Optimization: Sacred Soil provides a 500p HoT at lv78+. Allow it for high-efficiency single-target tank healing.
+            bool aoeNeedsSoil = Group.CastableAlliesWithin30.Any(r => PartyManager.VisibleMembers.Count(x => x.BattleCharacter.CurrentHealthPercent < ScholarSettings.Instance.SacredSoilHpPercent && x.BattleCharacter.Distance(r) <= Spells.SacredSoil.Radius) >= AoeNeedHealing);
+            bool tankNeedsSoil = Group.CastableTanks.Any(t => t.CurrentHealthPercent <= 85);
+
+            if (!aoeNeedsSoil && !tankNeedsSoil)
+                return false;
+
+            // Center on the most injured cluster, or fallback to centering directly on the hurt tank.
+            var sacredSoilTarget = aoeNeedsSoil
+                ? Group.CastableAlliesWithin30.FirstOrDefault(r => PartyManager.VisibleMembers.Count(x => x.BattleCharacter.CurrentHealthPercent < ScholarSettings.Instance.SacredSoilHpPercent && x.BattleCharacter.Distance(r) <= Spells.SacredSoil.Radius) >= AoeNeedHealing)
+                : Group.CastableTanks.FirstOrDefault(t => t.CurrentHealthPercent <= 85);
 
             if (sacredSoilTarget == null)
                 return false;

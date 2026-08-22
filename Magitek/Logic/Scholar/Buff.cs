@@ -56,7 +56,7 @@ namespace Magitek.Logic.Scholar
                     if (await Spells.SummonEos.Cast(Core.Me))
                     {
                         FairySummonCooldown = DateTime.Now.AddSeconds(10);
-                        break;
+                        return true; // Balance Optimization: Removed 5-second stall.
                     }
                     return false;
 
@@ -64,15 +64,15 @@ namespace Magitek.Logic.Scholar
                     if (await Spells.SummonSelene.Cast(Core.Me))
                     {
                         FairySummonCooldown = DateTime.Now.AddSeconds(10);
-                        break;
+                        return true; // Balance Optimization: Removed 5-second stall.
                     }
                     return false;
 
                 default:
                     return false;
             }
-
-            return await Coroutine.Wait(5000, () => Core.Me.Pet != null);
+            
+            // DELETE the "return await Coroutine.Wait(5000, () => Core.Me.Pet != null);" line that was here!
         }
 
         public static async Task<bool> SummonSeraph()
